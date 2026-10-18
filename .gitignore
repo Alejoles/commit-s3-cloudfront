@@ -1,0 +1,69 @@
+# ─── Secretos y credenciales (lo más importante de este archivo) ───────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+.aws/
+credentials
+aws-exports.*
+*.secret
+*.secrets
+
+# ─── Evidencia sin tapar ───────────────────────────────────────────────────
+# Las capturas que muestran el ID de cuenta de AWS van aquí hasta taparlas.
+# Solo se versiona lo que está en docs/evidence/ ya revisado.
+docs/evidence/_sin-tapar/
+docs/evidence/**/*.raw.*
+
+# ─── Terraform (mejora futura del taller) ──────────────────────────────────
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+*.tfvars
+*.tfvars.json
+override.tf
+override.tf.json
+# .terraform.lock.hcl SÍ se versiona
+
+# ─── Empaquetado de entregables ────────────────────────────────────────────
+*.zip
+!docs/**/*.zip
+
+# ─── Node / herramientas de medición (Lighthouse, servidores locales) ──────
+node_modules/
+npm-debug.log*
+.lighthouseci/
+lighthouse-*.html
+lighthouse-*.json
+
+# ─── Editores y sistema operativo ──────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ─── Herramientas de asistencia con IA (nada de esto va al repo) ───────────
+.atl/
+.impeccable/
+.claude/
+.codegraph/
+.engram/
+.opencode/
+.cursor/
+.aider*
+.gemini/
+CLAUDE.md
+AGENTS.md
+
+# ─── Logs y temporales ─────────────────────────────────────────────────────
+*.log
+*.tmp
+tmp/

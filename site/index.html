@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#0f1621" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f2f5f9" media="(prefers-color-scheme: light)">
+  <meta name="description" content="Sitio estático en un bucket S3 privado servido por CloudFront. Muestra en vivo si tu petición fue Hit o Miss, qué edge respondió y qué headers de seguridad añadió la función del edge.">
+  <title>S3 + CloudFront: estático, privado y en el edge</title>
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/css/styles.css">
+  <script src="assets/js/app.js" defer></script>
+</head>
+<body data-page="home" data-state="loading">
+  <a class="skip" href="#peticion">Saltar al contenido</a>
+
+  <svg class="sprite" aria-hidden="true" focusable="false">
+    <symbol id="i-hit" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/></symbol>
+    <symbol id="i-miss" viewBox="0 0 24 24"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 20h14"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.3-4.3L4 8.5M4 4v4.5h4.5M4 13a8 8 0 0 0 14.3 4.3L20 15.5M20 20v-4.5h-4.5"/></symbol>
+    <symbol id="i-error" viewBox="0 0 24 24"><path d="M12 3.5l9.5 16.5h-19z"/><path d="M12 10v4.5M12 17.5v.01"/></symbol>
+    <symbol id="i-none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></symbol>
+    <symbol id="i-offline" viewBox="0 0 24 24"><path d="M2.5 9a15 15 0 0 1 19 0M5.5 12.5a10 10 0 0 1 13 0M9 16a5 5 0 0 1 6 0M12 19.5v.01M3 3l18 18"/></symbol>
+    <symbol id="i-other" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 1-1 1.7M12 17v.01"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-cross" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-unknown" viewBox="0 0 24 24"><path d="M6 12h12"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></symbol>
+    <symbol id="i-edge" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></symbol>
+    <symbol id="i-cache" viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></symbol>
+    <symbol id="i-bucket" viewBox="0 0 24 24"><ellipse cx="12" cy="6.5" rx="8" ry="2.5"/><path d="M4 6.5L6 20h12l2-13.5"/></symbol>
+  </svg>
+
+  <p class="sr-only" id="live" role="status" aria-live="polite"></p>
+
+  <header class="top">
+    <div class="wrap top-inner">
+      <div class="title">
+        <img class="logo" src="assets/img/favicon.svg" alt="" width="44" height="44">
+        <div>
+          <h1>S3 + CloudFront: estático, privado y en el edge</h1>
+          <p class="sub">Esta página consulta sus propios headers y te muestra, en vivo, qué hizo CloudFront con tu petición.</p>
+        </div>
+      </div>
+      <p class="pill" id="pill">
+        <span class="dot" aria-hidden="true"></span>
+        <svg class="ico" aria-hidden="true"><use id="pillIcon" href="#i-refresh"/></svg>
+        <span id="pillText">CONSULTANDO</span>
+      </p>
+    </div>
+  </header>
+
+  <main id="main" class="wrap">
+    <div class="grid">
+
+      <section class="panel s-state" id="peticion" aria-labelledby="h-peticion">
+        <div class="panel-head">
+          <h2 id="h-peticion">Esta petición</h2>
+          <span class="panel-meta" id="metaTime">sin lectura</span>
+        </div>
+        <div class="readout" id="readout">
+          <p class="state-word" id="stateWord" aria-live="off">
+            <svg class="ico" aria-hidden="true"><use id="stateIcon" href="#i-refresh"/></svg>
+            <span id="stateLabel">CONSULTANDO</span>
+          </p>
+          <p class="state-text" id="stateText">Pidiendo esta misma URL otra vez, sin usar la caché del navegador, para leer los headers de la respuesta.</p>
+        </div>
+        <noscript><p class="nojs">Esta página necesita JavaScript para leer sus propios headers.</p></noscript>
+        <dl class="facts">
+          <div><dt>Código HTTP</dt><dd id="fStatus">—</dd></div>
+          <div><dt>Tiempo</dt><dd id="fTime">—</dd></div>
+          <div><dt>PoP</dt><dd id="fPop">—</dd></div>
+          <div><dt>Método</dt><dd id="fMethod">—</dd></div>
+        </dl>
+        <p class="note-line">Lectura de una petición nueva a esta misma URL, sin caché del navegador ni cookies.</p>
+        <div class="actions">
+          <button class="btn" type="button" id="btnProbe">
+            <svg class="ico" aria-hidden="true"><use href="#i-refresh"/></svg>
+            <span id="btnProbeText">Consultar de nuevo</span>
+          </button>
+          <div class="auto">
+            <label class="switch">
+              <input type="checkbox" role="switch" id="autoSwitch">
+              <span>Refrescar cada</span>
+            </label>
+            <select id="autoSecs" aria-label="Segundos entre lecturas">
+              <option value="5">5</option>
+              <option value="10" selected>10</option>
+              <option value="30">30</option>
+              <option value="60">60</option>
+            </select>
+            <span aria-hidden="true">s</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel s-diagram" aria-labelledby="h-camino">
+        <div class="panel-head">
+          <h2 id="h-camino">Camino de la petición</h2>
+        </div>
+        <figure class="figure">
+          <svg class="diagram diagram-h" viewBox="0 0 760 270" role="img" aria-labelledby="tH dH" data-path="">
+            <title id="tH">Camino de la petición</title>
+            <desc id="dH" data-slot="diagramDesc">Esperando el resultado de la consulta.</desc>
+            <rect class="zone" x="205" y="40" width="340" height="206" rx="12"/>
+            <text class="zone-title" x="223" y="66">Edge location</text>
+
+            <g class="seg" data-k="edge">
+              <line class="flow" x1="146" y1="132" x2="219" y2="132"/>
+              <path class="head" d="M212 128 L219 132 L212 136"/>
+              <line class="flow" x1="219" y1="152" x2="146" y2="152"/>
+              <path class="head" d="M153 148 L146 152 L153 156"/>
+            </g>
+            <g class="seg" data-k="cache">
+              <line class="flow" x1="351" y1="132" x2="399" y2="132"/>
+              <path class="head" d="M392 128 L399 132 L392 136"/>
+              <line class="flow" x1="399" y1="152" x2="351" y2="152"/>
+              <path class="head" d="M358 148 L351 152 L358 156"/>
+            </g>
+            <g class="seg" data-k="origin">
+              <line class="flow" x1="531" y1="132" x2="614" y2="132"/>
+              <path class="head" d="M607 128 L614 132 L607 136"/>
+              <line class="flow" x1="614" y1="152" x2="531" y2="152"/>
+              <path class="head" d="M538 148 L531 152 L538 156"/>
+            </g>
+
+            <g class="node" data-k="user" transform="translate(20 100)">
+              <rect width="120" height="84" rx="10"/>
+              <use class="ico" href="#i-user" x="46" y="12" width="28" height="28"/>
+              <text class="label" x="60" y="64">Usuario</text>
+            </g>
+            <g class="node" data-k="edge" transform="translate(225 100)">
+              <rect width="120" height="84" rx="10"/>
+              <use class="ico" href="#i-edge" x="46" y="12" width="28" height="28"/>
+              <text class="label" x="60" y="64">Edge</text>
+            </g>
+            <g class="node" data-k="cache" transform="translate(405 100)">
+              <rect width="120" height="84" rx="10"/>
+              <use class="ico" href="#i-cache" x="46" y="12" width="28" height="28"/>
+              <text class="label" x="60" y="64">Caché</text>
+            </g>
+            <g class="node" data-k="origin" transform="translate(620 100)">
+              <rect width="120" height="84" rx="10"/>
+              <use class="ico" href="#i-bucket" x="46" y="12" width="28" height="28"/>
+              <text class="label" x="60" y="64">S3</text>
+            </g>
+
+            <text class="note note-mid" x="80" y="208" data-note="user">Tu navegador</text>
+            <text class="note note-mid" x="285" y="208" data-note="edge">—</text>
+            <text class="note note-mid" x="465" y="208" data-note="cache">—</text>
+            <text class="note note-mid" x="680" y="208" data-note="origin">—</text>
+          </svg>
+
+          <svg class="diagram diagram-v" viewBox="0 0 360 540" role="img" aria-labelledby="tV dV" data-path="">
+            <title id="tV">Camino de la petición</title>
+            <desc id="dV" data-slot="diagramDesc">Esperando el resultado de la consulta.</desc>
+            <rect class="zone" x="24" y="112" width="312" height="300" rx="12"/>
+            <text class="zone-title" x="42" y="138">Edge location</text>
+
+            <g class="seg" data-k="edge">
+              <line class="flow" x1="168" y1="88" x2="168" y2="164"/>
+              <path class="head" d="M164 157 L168 164 L172 157"/>
+              <line class="flow" x1="192" y1="164" x2="192" y2="88"/>
+              <path class="head" d="M188 95 L192 88 L196 95"/>
+            </g>
+            <g class="seg" data-k="cache">
+              <line class="flow" x1="168" y1="246" x2="168" y2="294"/>
+              <path class="head" d="M164 287 L168 294 L172 287"/>
+              <line class="flow" x1="192" y1="294" x2="192" y2="246"/>
+              <path class="head" d="M188 253 L192 246 L196 253"/>
+            </g>
+            <g class="seg" data-k="origin">
+              <line class="flow" x1="168" y1="376" x2="168" y2="444"/>
+              <path class="head" d="M164 437 L168 444 L172 437"/>
+              <line class="flow" x1="192" y1="444" x2="192" y2="376"/>
+              <path class="head" d="M188 383 L192 376 L196 383"/>
+            </g>
+
+            <g class="node" data-k="user" transform="translate(120 12)">
+              <rect width="120" height="70" rx="10"/>
+              <use class="ico" href="#i-user" x="46" y="8" width="28" height="28"/>
+              <text class="label" x="60" y="56">Usuario</text>
+            </g>
+            <g class="node" data-k="edge" transform="translate(120 170)">
+              <rect width="120" height="70" rx="10"/>
+              <use class="ico" href="#i-edge" x="46" y="8" width="28" height="28"/>
+              <text class="label" x="60" y="56">Edge</text>
+            </g>
+            <g class="node" data-k="cache" transform="translate(120 300)">
+              <rect width="120" height="70" rx="10"/>
+              <use class="ico" href="#i-cache" x="46" y="8" width="28" height="28"/>
+              <text class="label" x="60" y="56">Caché</text>
+            </g>
+            <g class="node" data-k="origin" transform="translate(120 450)">
+              <rect width="120" height="70" rx="10"/>
+              <use class="ico" href="#i-bucket" x="46" y="8" width="28" height="28"/>
+              <text class="label" x="60" y="56">S3</text>
+            </g>
+
+            <text class="note" x="252" y="52" data-note="user">Tu navegador</text>
+            <text class="note" x="252" y="210" data-note="edge">—</text>
+            <text class="note" x="252" y="340" data-note="cache">—</text>
+            <text class="note" x="252" y="490" data-note="origin">—</text>
+          </svg>
+          <figcaption class="legend">Línea animada: tramo que recorrió la petición. Atenuado: tramo que no se usó.</figcaption>
+        </figure>
+      </section>
+
+      <section class="panel s-headers" aria-labelledby="h-headers">
+        <div class="panel-head">
+          <h2 id="h-headers">Headers de la respuesta</h2>
+          <span class="panel-meta" id="metaHeaders">0 headers</span>
+        </div>
+        <div class="scroll" role="region" aria-label="Tabla de headers de la respuesta" tabindex="0">
+          <table class="tbl-headers">
+            <thead><tr><th scope="col">Header</th><th scope="col">Valor</th></tr></thead>
+            <tbody id="headersBody">
+              <tr><td colspan="2" class="empty">Esperando la respuesta…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel s-cache" aria-labelledby="h-cache">
+        <div class="panel-head">
+          <h2 id="h-cache">Vida del objeto en caché</h2>
+        </div>
+        <div class="cache-body">
+          <div>
+            <div class="bar" id="ttlBar" role="progressbar" aria-labelledby="h-cache" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" data-expired="false">
+              <span class="bar-fill" id="ttlFill"></span>
+            </div>
+            <div class="bar-scale" aria-hidden="true"><span>0 s</span><span id="ttlMax">—</span></div>
+            <p class="ttl-text" id="ttlText">Esperando la respuesta…</p>
+          </div>
+          <dl class="facts">
+            <div><dt>Edad (age)</dt><dd id="cAge">—</dd></div>
+            <div><dt>TTL (max-age)</dt><dd id="cTtl">—</dd></div>
+            <div><dt>Cache-Control</dt><dd id="cCc">—</dd></div>
+          </dl>
+        </div>
+      </section>
+
+      <section class="panel s-exp" aria-labelledby="h-exp">
+        <div class="panel-head">
+          <h2 id="h-exp">Experimento: 5 peticiones seguidas</h2>
+        </div>
+        <div class="exp-intro">
+          <p>Lanza cinco peticiones una tras otra al mismo documento y compara cómo respondió la caché y cuánto tardó cada una.</p>
+          <button class="btn" type="button" id="btnExp">Probar 5 veces</button>
+        </div>
+        <div class="exp-body">
+          <div class="exp-table scroll" role="region" aria-label="Resultados del experimento" tabindex="0">
+            <table class="tbl-exp">
+              <thead>
+                <tr>
+                  <th scope="col">#</th>
+                  <th scope="col">x-cache</th>
+                  <th scope="col">age</th>
+                  <th scope="col">PoP</th>
+                  <th scope="col">Tiempo</th>
+                </tr>
+              </thead>
+              <tbody id="expBody">
+                <tr><td colspan="5" class="empty">Todavía no hay resultados. Pulsa «Probar 5 veces».</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="exp-side">
+            <div class="summary" id="expSummary"><p class="muted small">El resumen aparece al terminar las cinco peticiones.</p></div>
+            <p class="summary-diff" id="expDiff"></p>
+            <svg class="chart" id="chart" viewBox="0 0 360 170" role="img" aria-label="Tiempos de las peticiones: sin datos todavía">
+              <line class="chart-base" x1="0" y1="118" x2="360" y2="118"/>
+              <g id="chartBars"></g>
+            </svg>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel s-sec" aria-labelledby="h-sec">
+        <div class="panel-head">
+          <h2 id="h-sec">Checklist de seguridad</h2>
+        </div>
+        <p class="score" id="secScore">Sin datos todavía</p>
+        <ul class="checks" id="checks"></ul>
+      </section>
+
+      <section class="panel s-about" aria-labelledby="h-about">
+        <div class="panel-head">
+          <h2 id="h-about">Qué es esto</h2>
+        </div>
+        <div class="panel-body prose">
+          <p>Laboratorio del taller de AWS: un sitio estático en un bucket de S3 privado. Solo CloudFront puede leerlo, mediante Origin Access Control, y lo entrega por HTTPS desde la edge location más cercana.</p>
+          <p>Una CloudFront Function en el evento <em>viewer response</em> añade los headers de seguridad que ves en el checklist.</p>
+          <p>JavaScript no puede leer los headers del documento que ya cargó. Por eso la página repite la petición a su propia URL y lee esa respuesta. Todo sale del mismo origen: sin CDNs, fuentes remotas ni analíticas.</p>
+          <p class="links">
+            <a href="https://github.com/Alejoles/commit-s3-cloudfront">Repositorio</a>
+            <a href="https://github.com/Alejoles/commit-s3-cloudfront/blob/main/docs/architecture.md">Arquitectura</a>
+          </p>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <footer class="foot">
+    <div class="wrap foot-inner">
+      <p><span id="year">2026</span> · Alejo</p>
+      <ul>
+        <li><a href="https://github.com/Alejoles/commit-s3-cloudfront">Repositorio</a></li>
+      </ul>
+    </div>
+  </footer>
+</body>
+</html>

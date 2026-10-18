@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#0f1621" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f2f5f9" media="(prefers-color-scheme: light)">
+  <meta name="robots" content="noindex">
+  <title>404 · Ruta no encontrada</title>
+  <!-- Rutas absolutas: CloudFront sirve esta página en cualquier URL inexistente. -->
+  <link rel="icon" href="/assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/assets/css/styles.css">
+  <script src="/assets/js/app.js" defer></script>
+</head>
+<body data-page="notfound" data-state="error">
+  <header class="top">
+    <div class="wrap title">
+      <img class="logo" src="/assets/img/favicon.svg" alt="" width="44" height="44">
+      <p class="sub">S3 + CloudFront: estático, privado y en el edge</p>
+    </div>
+  </header>
+
+  <main class="wrap nf">
+    <p class="nf-code">404</p>
+    <h1>No encontramos esa ruta</h1>
+    <p>La ruta <code id="requestedPath">solicitada</code> no existe en este sitio.</p>
+    <p class="muted">Con un bucket privado y sin permiso de listado, S3 responde 403 cuando falta un archivo. CloudFront lo convierte en esta página con código 404.</p>
+    <a class="btn" href="/">Volver al inicio</a>
+  </main>
+</body>
+</html>

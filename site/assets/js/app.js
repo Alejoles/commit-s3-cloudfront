@@ -119,7 +119,7 @@
     ['referrer-policy', 'Limita la información de origen que se envía al salir de la página.'],
     ['permissions-policy', 'Desactiva cámara, micrófono y geolocalización.'],
     ['content-security-policy', 'Solo permite recursos del mismo origen y sin código en línea.'],
-    ['x-edge-function', 'Marca propia que confirma que la función del edge se ejecutó.']
+    ['x-lab-function', 'Marca propia que confirma que la función del edge se ejecutó.']
   ];
 
   /* ---------------------------------------------------------------- utilidades */
